@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import personService from './services/persons'
 
 const Filter = (props) => <div>filter shown with: <input onChange={props.handleSearch}/></div>
 
@@ -14,33 +15,50 @@ const PersonForm = (props) => {
   )
 }
 
+const Notification = ({ message,stylename }) => {
+  if (message === null) {
+    return null
+  }
+  return (
+    <div className={stylename}>
+      {message}
+    </div>
+  )
+}
+
 const Persons = (props) => {
   return (
     props.persons.map(person =>
       <div key={person.id}>
         {person.name} {person.number}
+        <button onClick={()=>props.del(person.id,person.name)}>delete</button>
       </div>
     )
   )
 }
 
 const App = () => {
-  const [persons, setPersons] = useState([
-    { name: 'Arto Hellas', number: '040-123456', id: 1 },
-    { name: 'Ada Lovelace', number: '39-44-5323523', id: 2 },
-    { name: 'Dan Abramov', number: '12-43-234345', id: 3 },
-    { name: 'Mary Poppendieck', number: '39-23-6423122', id: 4 }
-  ])
+  const [persons, setPersons] = useState([])
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
-  const [personsToShow, setPersonsToShow] = useState(persons);
+  const [personsToShow, setPersonsToShow] = useState(persons)
+  const [errorMessage, setErrorMessage] = useState(null)
+  const [styleName, setstyleName] = useState('messg')
+
+  useEffect(() => {
+    personService      
+      .getAll()      
+      .then(initialPersons => {        
+        setPersons(initialPersons)  
+        setPersonsToShow(initialPersons)  
+      })  
+  }, [])
 
   const addPhone = (event) => {    
     event.preventDefault()
     const phoneObject = {
       name: newName,
       number: newNumber,
-      id: persons.length + 1,
     }
 
     for (var person of persons) {
@@ -52,11 +70,43 @@ const App = () => {
       }
     }
 
-    const updatedPersons = persons.concat(phoneObject)
-    setPersons(updatedPersons)
-    setPersonsToShow(updatedPersons)
-    setNewName('')
-    setNewNumber('')
+    personService      
+      .create(phoneObject)      
+      .then(returnedNote => {
+        const updatedPersons = persons.concat(phoneObject)
+        setPersons(updatedPersons)
+        setPersonsToShow(updatedPersons)
+        setNewName('')
+        setNewNumber('')
+        setstyleName('messg')
+        setErrorMessage(          
+          `Added ${phoneObject.name}`        
+        )
+        setTimeout(() => {          
+          setErrorMessage(null)        
+        }, 5000)
+      })
+  }
+
+  const detetePerson = (id,name) => {    
+    if (window.confirm(`Delete ${name} ?`)) {
+      personService      
+      .del(id)    
+      .then(response => {  
+        console.log(`Deleted user ${name}`) 
+        setPersons(persons.filter(person => person.id !== id))
+        setPersonsToShow(persons.filter(person => person.id !== id))
+      })
+      .catch(error => {  
+        setstyleName('error')
+        setErrorMessage(
+          `Information of '${name}' has already been removed from the server`        
+        )
+        setTimeout(() => {
+          setErrorMessage(null)        
+        }, 5000)  
+      })
+    }
   }
 
   const handleNameChange = (event) => {    
@@ -83,11 +133,12 @@ const App = () => {
   return (
     <div>
       <h2>Phonebook</h2>
+      <Notification message={errorMessage} stylename={styleName}/>
       <Filter handleSearch={handleSearchChange}/>
       <h3>Add a new</h3>
       <PersonForm onSubmit={addPhone} newName={newName} chgName={handleNameChange} newNumber={newNumber} chgNumber={handleNumberChange}/>
       <h3>Numbers</h3>
-      <Persons persons={personsToShow} />
+      <Persons persons={personsToShow} del={detetePerson} />
     </div>
   )
 }
